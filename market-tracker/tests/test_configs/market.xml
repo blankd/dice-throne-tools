@@ -1,0 +1,60 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<market>
+   <players>
+      <player>
+        <name>Darek</name>
+        <purse>5</purse>
+        <characters>
+          <character>Shadow Thief</character>
+          <character>Samurai</character>
+          <character>Thor</character>
+          <character>Pyromancer</character>
+          <character>Loki</character>
+          <character>Cursed Pirate</character>
+        </characters>
+        <banished>
+          <character>Santa</character>
+          <character>Seraph</character>
+          <character>Spider-man</character>
+          <character>Gunslinger</character>
+          <character>Scarlet Witch</character>
+        </banished>
+      </player>
+      <player>
+        <name>Sherri</name>
+        <purse>6</purse>
+        <characters>
+          <character>Dr. Strange</character>
+          <character>Monk</character>
+          <character>Huntress</character>
+          <character>Krampus</character>
+          <character>Pyromancer</character>
+          <character>Scarlet Witch</character>
+        </characters>
+        <banished>
+          <character>Treant</character>
+          <character>Black Widow</character>
+          <character>Barbarian</character>
+        </banished>
+      </player>
+      <player>
+        <name>Brian</name>
+        <purse>10</purse>
+        <characters>
+          <character>Paladin</character>
+          <character>Tactician</character>
+          <character>Black Widow</character>
+          <character>Artificer</character>
+          <character>Vampire Lord</character>
+          <character>Santa</character>
+          <character>Black Panther</character>
+          <character>Barbarian</character>
+        </characters>
+        <banished>
+          <character>Ninja</character>
+          <character>Thor</character>
+          <character>Captain Marvel</character>
+        </banished>
+      </player>
+    </players>
+</market>
