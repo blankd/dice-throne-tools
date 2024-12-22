@@ -4,7 +4,7 @@ from xml.dom.pulldom import CHARACTERS
 from xml.etree.ElementTree import parse
 
 from obj import is_str_valid
-from obj.xml import MarketPlayerXML, XmlElements, NotXML, WrongXMLElement, is_iterable, make_list_from
+from obj.xml import MarketPlayerXML, XmlElements, NotXML, WrongXMLElement, is_iterable, make_list_from, MarketConfigXML
 
 
 def make_xml(tag, text, parent=None):
@@ -22,6 +22,37 @@ SHERRI_BANISHED = ["Black Widow", "Treant", "Barbarian"]
 SHERRI_CHARACTERS = ["Dr. Strange", "Monk", "Huntress", "Krampus", "Pyromancer", "Scarlet Witch"]
 SHERRI_NAME = "Sherri"
 SHERRI_PURSE = 6
+
+CONFIG_CONSTRUCTOR_DRAFT = 5
+CONFIG_CONSTRUCTOR_INITIAL_PURSE = 3
+CONFIG_CONSTRUCTOR_ANTE = 2
+CONFIG_CONSTRUCTOR_BUY_CHAR = 2
+CONFIG_CONSTRUCTOR_SELL_CHAR = 1
+CONFIG_CONSTRUCTOR_BANISH_CHAR = 8
+
+CONFIG_STRING_DRAFT = 2
+CONFIG_STRING_INITIAL_PURSE = 3
+CONFIG_STRING_ANTE = 1
+CONFIG_STRING_BUY_CHAR = 4
+CONFIG_STRING_SELL_CHAR = 1
+CONFIG_STRING_BANISH_CHAR = 4
+CONFIG_STRING_ALWAYS_PRESET = (make_xml(XmlElements.INITIAL_DRAFT.value, CONFIG_STRING_DRAFT),
+                               make_xml(XmlElements.START_COINS.value, CONFIG_STRING_INITIAL_PURSE),
+                               make_xml(XmlElements.GAME_ANTE.value, CONFIG_STRING_ANTE),
+                               make_xml(XmlElements.BUY.value, CONFIG_STRING_BUY_CHAR),
+                               make_xml(XmlElements.BANISH.value, CONFIG_STRING_BANISH_CHAR))
+CONFIG_XML = "{}".format(make_xml(XmlElements.CONFIG.value,
+                                  f"{''.join(CONFIG_STRING_ALWAYS_PRESET)}{make_xml(XmlElements.SELL.value, CONFIG_STRING_SELL_CHAR)}",
+                                  XmlElements.MARKET.value))
+CONFIG_XML_NO_SELL = "<{}>{}</{}>".format(XmlElements.CONFIG.value, ''.join(CONFIG_STRING_ALWAYS_PRESET),
+                                          XmlElements.CONFIG.value)
+
+CONFIG_FILE_DRAFT = 4
+CONFIG_FILE_INITIAL_PURSE = 5
+CONFIG_FILE_ANTE = -1
+CONFIG_FILE_BUY_CHAR = -3
+CONFIG_FILE_SELL_CHAR = 2
+CONFIG_FILE_BANISH_CHAR = 7
 
 PLAYER_CONSTRUCTOR_NAME = "Talos"
 PLAYER_CONSTRUCTOR_PURSE = 12
@@ -97,14 +128,61 @@ class TestMarketPlayerXml(MarketXmlTest):
         xml = self.player.write_to()
         self.assertEqual(xml.find(XmlElements.NAME.value).text, SHERRI_NAME)
         self.assertEqual(xml.find(XmlElements.PURSE.value).text, SHERRI_PURSE)
-        self.assertAllIn(make_list_from(found=xml, the_path=[XmlElements.CHARACTERS.value, XmlElements.CHARACTER.value]), SHERRI_CHARACTERS)
-        self.assertAllIn(make_list_from(found=xml, the_path=[XmlElements.BANISHED.value, XmlElements.CHARACTER.value]), SHERRI_BANISHED)
+        self.assertAllIn(
+            make_list_from(found=xml, the_path=[XmlElements.CHARACTERS.value, XmlElements.CHARACTER.value]),
+            SHERRI_CHARACTERS)
+        self.assertAllIn(make_list_from(found=xml, the_path=[XmlElements.BANISHED.value, XmlElements.CHARACTER.value]),
+                         SHERRI_BANISHED)
 
     def __assert_player(self, name, purse, chars, banished):
         self._if_func_run_else_equal(self.player.player_name, name)
         self._if_func_run_else_equal(self.player.purse, purse)
         self._if_func_run_else_equal(self.player.characters, chars)
         self._if_func_run_else_equal(self.player.banished, banished)
+
+
+class TestMarketConfigGameXML(MarketXmlTest):
+    def test_constructor(self):
+        self.config = MarketConfigXML(draft=CONFIG_CONSTRUCTOR_DRAFT, initial_purse=CONFIG_CONSTRUCTOR_INITIAL_PURSE,
+                                      ante=CONFIG_CONSTRUCTOR_ANTE, buy_char=CONFIG_CONSTRUCTOR_BUY_CHAR,
+                                      sell_char=CONFIG_CONSTRUCTOR_SELL_CHAR,
+                                      banish_char=CONFIG_CONSTRUCTOR_BANISH_CHAR)
+        self.__match_values(CONFIG_CONSTRUCTOR_DRAFT, CONFIG_CONSTRUCTOR_INITIAL_PURSE, CONFIG_CONSTRUCTOR_ANTE,
+                            CONFIG_CONSTRUCTOR_BUY_CHAR, CONFIG_CONSTRUCTOR_BANISH_CHAR, CONFIG_CONSTRUCTOR_SELL_CHAR)
+
+    def test_string_market(self):
+        self.config = MarketConfigXML(xml=CONFIG_XML)
+        self.__match_values(CONFIG_STRING_DRAFT, CONFIG_STRING_INITIAL_PURSE, CONFIG_STRING_ANTE,
+                            CONFIG_STRING_BUY_CHAR, CONFIG_STRING_BANISH_CHAR, CONFIG_STRING_SELL_CHAR)
+
+    def test_string_config(self):
+        self.config = MarketConfigXML(xml=CONFIG_XML_NO_SELL)
+        self.__match_values(CONFIG_STRING_DRAFT, CONFIG_STRING_INITIAL_PURSE, CONFIG_STRING_ANTE,
+                            CONFIG_STRING_BUY_CHAR, CONFIG_STRING_BANISH_CHAR)
+
+    def test_file(self):
+        self.config = MarketConfigXML(xml=self.market)
+        self.__match_values(CONFIG_FILE_DRAFT, CONFIG_FILE_INITIAL_PURSE, CONFIG_FILE_ANTE,
+                            CONFIG_FILE_BUY_CHAR, CONFIG_FILE_BANISH_CHAR, CONFIG_FILE_SELL_CHAR)
+
+    def test_write_xml(self):
+        self.config = MarketConfigXML(xml=self.market)
+        wrote = self.config.write_to()
+        self._if_func_run_else_equal(wrote, lambda d: int(wrote.find(XmlElements.INITIAL_DRAFT.value).text) == CONFIG_FILE_DRAFT)
+        self._if_func_run_else_equal(wrote, lambda d: int(wrote.find(XmlElements.START_COINS.value).text) == CONFIG_FILE_INITIAL_PURSE)
+        self._if_func_run_else_equal(wrote, lambda d: int(wrote.find(XmlElements.GAME_ANTE.value).text) == CONFIG_FILE_ANTE)
+        self._if_func_run_else_equal(wrote, lambda d: int(wrote.find(XmlElements.BUY.value).text) == CONFIG_FILE_BUY_CHAR)
+        self._if_func_run_else_equal(wrote, lambda d: int(wrote.find(XmlElements.SELL.value).text) == CONFIG_FILE_SELL_CHAR)
+        self._if_func_run_else_equal(wrote, lambda d: int(wrote.find(XmlElements.BANISH.value).text) == CONFIG_FILE_BANISH_CHAR)
+
+    def __match_values(self, draft, initial_purse, ante, buy_char, banish_char, sell_char=None):
+        self._if_func_run_else_equal(self.config.draft, draft)
+        self._if_func_run_else_equal(self.config.initial_purse, initial_purse)
+        self._if_func_run_else_equal(self.config.ante, ante)
+        self._if_func_run_else_equal(self.config.buy_char, buy_char)
+        self._if_func_run_else_equal(self.config.banish_char, banish_char)
+        if sell_char is not None:
+            self._if_func_run_else_equal(self.config.sell_char, sell_char)
 
 
 if __name__ == '__main__':

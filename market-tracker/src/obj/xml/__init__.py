@@ -1,5 +1,5 @@
 from enum import Enum
-from obj import MarketPlayer, is_plural, is_str_valid
+from obj import MarketPlayer, is_plural, is_str_valid, MarketConfig, if_none_then_default
 from xml.etree.ElementTree import parse, Element, SubElement, fromstring
 
 from obj.xml.errors import NotXML, WrongXMLElement
@@ -77,8 +77,23 @@ def add_sub_elements(elem: Element, sub_elems, sub_attrs=None):
 def follow_xpath(xml, *the_path):
     ret = None
     for i in range(0, len(the_path)):
-        path = '/{}'.format('/'.join(the_path[i:]))
-        print(path)
+        ret = xml.find('./{}'.format('/'.join(the_path[i:])))
+        if ret is not None:
+            return ret
+    return ret
+
+def get_element_text_else_raise(xml: Element, expected_tag, no_xml_msg=None) -> str:
+    try:
+        if xml is not None and xml.tag == expected_tag:
+            return xml.text
+        else:
+            raise WrongXMLElement(got_tag=xml.tag if xml is not None else "Unknown", expected_tag=expected_tag)
+    except AttributeError:
+        if is_str_valid(no_xml_msg):
+            raise NotXML(no_xml_msg)
+        else:
+           raise NotXML(f"Was expecting an Element, got {type(xml)}")
+
 
 
 def make_list_from(found, **kwargs):
@@ -133,3 +148,39 @@ class MarketPlayerXML(MarketPlayer):
         add_sub_elements(player, subs)
         return player
 
+
+class MarketConfigXML(MarketConfig):
+    def __init__(self, draft=0, initial_purse=0, ante=0, buy_char=0, sell_char=None, banish_char=0, xml=None):
+        super().__init__(draft=draft, initial_purse=initial_purse, ante=ante, buy_char=buy_char, sell_char=sell_char, banish_char=banish_char)
+        if xml is not None:
+            self.read_from(parse_xml_if_str(xml))
+
+    def read_from(self, xml):
+        try:
+            self.draft = int(get_element_text_else_raise(follow_xpath(xml, XmlElements.CONFIG.value, XmlElements.INITIAL_DRAFT.value), XmlElements.INITIAL_DRAFT.value, f"Got {type(xml)} when looking for {XmlElements.INITIAL_DRAFT.value} element"))
+            self.initial_purse = int(get_element_text_else_raise(follow_xpath(xml, XmlElements.CONFIG.value, XmlElements.START_COINS.value), XmlElements.START_COINS.value, f"Got {type(xml)} when looking for {XmlElements.START_COINS.value} element"))
+            self.ante = int(get_element_text_else_raise(follow_xpath(xml, XmlElements.CONFIG.value, XmlElements.GAME_ANTE.value), XmlElements.GAME_ANTE.value, f"Got {type(xml)} when looking for {XmlElements.GAME_ANTE.value} element"))
+            self.buy_char = int(get_element_text_else_raise(follow_xpath(xml, XmlElements.CONFIG.value, XmlElements.BUY.value), XmlElements.BUY.value, f"Got {type(xml)} when looking for {XmlElements.BUY.value} element"))
+            self.banish_char = int(get_element_text_else_raise(follow_xpath(xml, XmlElements.CONFIG.value, XmlElements.BANISH.value), XmlElements.BANISH.value, f"Got {type(xml)} when looking for {XmlElements.BANISH.value} element"))
+            has_sell = follow_xpath(xml, XmlElements.CONFIG.value, XmlElements.SELL.value)
+            if has_sell is not None:
+                self.sell_char = int(get_element_text_else_raise(has_sell, XmlElements.SELL.value, f"Got {type(xml)} when looking for {XmlElements.SELL.value} element"))
+
+        except AttributeError:
+            raise NotXML(f"Was expecting an Element, got {type(xml)}")
+
+
+    def write_to(self) -> Element:
+        subs = {
+            XmlElements.INITIAL_DRAFT.value: self.draft,
+            XmlElements.START_COINS.value: self.initial_purse,
+            XmlElements.BUY.value: self.buy_char,
+            XmlElements.GAME_ANTE.value: self.ante,
+            XmlElements.BANISH.value: self.banish_char
+        }
+        if self.sell_char is not None:
+            subs[XmlElements.SELL.value] = self.sell_char
+
+        config = Element(XmlElements.CONFIG.value)
+        add_sub_elements(config, subs)
+        return config
