@@ -53,3 +53,30 @@ class MarketPlayer(MarketAspect, ABC):
                                                                                      is_plural(self.characters),
                                                                                      ", ".join(self.characters),
                                                                                      ", ".join(self.banished))
+
+
+class MarketConfig(MarketAspect, ABC):
+    def __init__(self, draft=0, initial_purse=0, ante=0, buy_char=0, sell_char=None, banish_char=0):
+        self.draft = if_none_then_default(draft, 3)
+        self.initial_purse = if_none_then_default(initial_purse, 3)
+        self.ante = if_none_then_default(ante, 1)
+        self.buy_char = if_none_then_default(buy_char, 3)
+        self.sell_char = sell_char
+        self.banish_char = if_none_then_default(banish_char, 5)
+
+    def __eq__(self, other):
+        return self.draft == other.draft and self.initial_purse == other.initial_purse and self.ante == other.ante and \
+            self.banish_char == other.banish_char and self.sell_char == other.sell_char and \
+            self.buy_char == other.buy_char
+
+    def __str__(self):
+        sell_part = " Sell characters for {} coin{},".format(self.sell_char, is_plural(
+            self.sell_char)) if self.sell_char is not None else ""
+        return ("Game configuration: Draft {} character{}, Start with {} coin{}, Game ante is {}, Buy characters "
+                "for {} coin{},{} Banish characters for {} coin{}").format(self.draft, is_plural(self.draft),
+                                                                           self.initial_purse,
+                                                                           is_plural(self.initial_purse), self.ante,
+                                                                           is_plural(self.ante), self.buy_char,
+                                                                           is_plural(self.buy_char), sell_part,
+                                                                           self.banish_char,
+                                                                           is_plural(self.banish_char))
