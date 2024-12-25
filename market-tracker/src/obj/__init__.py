@@ -1,6 +1,8 @@
 from abc import ABC, abstractmethod
+from datetime import datetime
 from xml.etree.ElementTree import Element
 
+DATE_FORMAT = "%Y-%m-%d %H:%M:%S.%f"
 
 def are_all_in_collection(checking, expected):
     if not isinstance(checking, (set, list, tuple) or not isinstance(expected, (set, list, tuple))):
@@ -80,3 +82,19 @@ class MarketConfig(MarketAspect, ABC):
                                                                            is_plural(self.buy_char), sell_part,
                                                                            self.banish_char,
                                                                            is_plural(self.banish_char))
+
+class MarketGameParticipant(MarketAspect, ABC):
+    def __init__(self, player=None, character=None):
+        self.player = player
+        self.character = character
+
+    def __eq__(self, other):
+        return self.player == other.player and self.character == other.character
+
+    def __str__(self):
+        return "Participant {} used {}".format(self.player, self.character)
+
+class MarketGame(MarketAspect, ABC):
+    def __init__(self, date=datetime.now(), participants=None):
+        self.participants = if_none_then_default(participants, list())
+        self.date = date

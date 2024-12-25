@@ -1,9 +1,8 @@
 from enum import Enum
-from obj import MarketPlayer, is_plural, is_str_valid, MarketConfig, if_none_then_default
+from obj import MarketPlayer, is_plural, is_str_valid, MarketConfig, if_none_then_default, MarketGameParticipant
 from xml.etree.ElementTree import parse, Element, SubElement, fromstring
 
-from obj.xml.errors import NotXML, WrongXMLElement
-
+from obj.xml.errors import NotXML, WrongXMLElement, MissingAttribute
 
 class XmlElements(Enum):
     ACTIONS = "actions"
@@ -46,32 +45,41 @@ class XmlAttributes(Enum):
     DATE = "date"
     PLAYER = "player"
 
+def get_enum_value(what) -> str:
+    try:
+        return what.value
+    except AttributeError:
+        return what
 
 def is_iterable(what) -> bool:
     return isinstance(what, (set, tuple, list))
 
 
-def add_sub_elements(elem: Element, sub_elems, sub_attrs=None):
-    def try_add_sub_element(s_elem, val):
-        try:
-            if sub_attrs is not None and sub_elem in sub_attrs:
-                SubElement(elem, s_elem.value, sub_attrs[sub_elem.value]).text = val
-            else:
-                SubElement(elem, s_elem.value).text = val
-        except AttributeError:
-            if sub_attrs is not None and sub_elem in sub_attrs:
-                SubElement(elem, s_elem, sub_attrs[sub_elem]).text = val
-            else:
-                SubElement(elem, s_elem).text = val
-
+def add_sub_elements(parent: Element, sub_elems, sub_attrs=None):
     for sub_elem, value in sub_elems.items():
-        if is_iterable(value):
-            for v in value:
-                try_add_sub_element(sub_elem, v)
-        elif isinstance(value, dict):
-            add_sub_elements(elem=sub_elem, sub_elems=value, sub_attrs=sub_attrs)
-        else:
-            try_add_sub_element(sub_elem, value)
+        try:
+            if isinstance(value, dict):
+                add_sub_elements(SubElement(parent, sub_elem.value), value, sub_attrs)
+            elif is_iterable(value):
+                for val in value:
+                    if isinstance(val, dict):
+                        add_sub_elements(SubElement(parent, sub_elem.value), val, sub_attrs)
+                    else:
+                        SubElement(parent, sub_elem.value).text = str(val)
+            else:
+                SubElement(parent, sub_elem.value).text = str(value)
+        except AttributeError:
+            if isinstance(value, dict):
+                add_sub_elements(SubElement(parent, sub_elem), value, sub_attrs)
+            elif is_iterable(value):
+                for val in value:
+                    if isinstance(val, dict):
+                        add_sub_elements(SubElement(parent, sub_elem), val, sub_attrs)
+                    else:
+                        SubElement(parent, sub_elem).text = str(val)
+            else:
+                SubElement(parent, sub_elem).text = str(value)
+
 
 
 def follow_xpath(xml, *the_path):
@@ -81,6 +89,12 @@ def follow_xpath(xml, *the_path):
         if ret is not None:
             return ret
     return ret
+
+def get_attribute_else_raise(xml: Element, attrib) -> str:
+    try:
+        return xml.attrib[attrib]
+    except KeyError:
+        raise MissingAttribute(missing_attrib=attrib, tag=xml.tag)
 
 def get_element_text_else_raise(xml: Element, expected_tag, no_xml_msg=None) -> str:
     try:
@@ -130,7 +144,7 @@ class MarketPlayerXML(MarketPlayer):
                 self.characters = make_list_from(found=xml,
                                                  the_path=[XmlElements.CHARACTERS.value, XmlElements.CHARACTER.value])
                 self.banished = make_list_from(found=xml,
-                                               the_path=f"./{XmlElements.BANISH.value}/{XmlElements.CHARACTER.value}")
+                                               the_path=f"./{XmlElements.BANISHED.value}/{XmlElements.CHARACTER.value}")
             else:
                 raise WrongXMLElement(got_tag=xml.tag if xml is not None else "Unknown",
                                       expected_tag=XmlElements.PLAYER.value)
@@ -141,8 +155,8 @@ class MarketPlayerXML(MarketPlayer):
         subs = {
             XmlElements.NAME: self.player_name,
             XmlElements.PURSE: self.purse,
-            XmlElements.CHARACTERS: self.characters,
-            XmlElements.BANISHED: self.banished
+            XmlElements.CHARACTERS: {XmlElements.CHARACTER.value: self.characters},
+            XmlElements.BANISHED: {XmlElements.CHARACTER.value: self.banished}
         }
         player = Element(XmlElements.PLAYER.value)
         add_sub_elements(player, subs)
@@ -184,3 +198,19 @@ class MarketConfigXML(MarketConfig):
         config = Element(XmlElements.CONFIG.value)
         add_sub_elements(config, subs)
         return config
+
+class MarketGameParticipantXML(MarketGameParticipant):
+    def __init__(self, player=None, character=None, xml=None):
+        super().__init__(player, character)
+        if xml is not None:
+            self.read_from(parse_xml_if_str(xml))
+
+    def write_to(self, **kwargs) -> Element:
+        part = Element(tag=XmlElements.CHARACTER.value, attrib={XmlAttributes.PLAYER.value: self.player})
+        part.text = self.character
+        return part
+
+    def read_from(self, xml):
+        self.character = get_element_text_else_raise(xml, XmlElements.CHARACTER.value, f"Got {type(xml)} when looking for {XmlElements.CHARACTER.value} element")
+        self.player = get_attribute_else_raise(xml, XmlAttributes.PLAYER.value)
+
