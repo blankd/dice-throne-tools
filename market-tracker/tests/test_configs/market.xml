@@ -74,5 +74,12 @@
         <character player="Brian">Paladin</character>
       </participants>
     </game>
+    <game date="2024-04-04 12:19:23.123">
+      <participants>
+        <character player="Darek">Dr. Strange</character>
+        <character player="Brian">Samurai</character>
+        <character player="Sherri">Vampire Lord</character>
+      </participants>
+    </game>
   </games>
 </market>

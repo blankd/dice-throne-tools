@@ -4,6 +4,7 @@ from xml.etree.ElementTree import Element
 
 DATE_FORMAT = "%Y-%m-%d %H:%M:%S.%f"
 
+
 def are_all_in_collection(checking, expected):
     if not isinstance(checking, (set, list, tuple) or not isinstance(expected, (set, list, tuple))):
         return False
@@ -12,6 +13,17 @@ def are_all_in_collection(checking, expected):
         if e not in checking:
             return False
     return True
+
+def parse_datetime(what: str | datetime, fmt = DATE_FORMAT) -> datetime | str | None:
+    if what is not None:
+        if isinstance(what, datetime):
+            return what
+        elif isinstance(what, str):
+            return datetime.strptime(what, fmt)
+    return what
+
+def in_map(key, kv_map=None) -> bool:
+    return kv_map is not None and key in kv_map
 
 
 def if_none_then_default(what, default=None):
@@ -46,8 +58,9 @@ class MarketPlayer(MarketAspect, ABC):
         self.banished = if_none_then_default(banished, list())
 
     def __eq__(self, other):
-        return self.player_name == other.player_name and self.purse == other.purse and are_all_in_collection(
-            self.characters, other.characters) and are_all_in_collection(self.banished, other.banished)
+        return other is not None and (
+                self.player_name == other.player_name and self.purse == other.purse and are_all_in_collection(
+            self.characters, other.characters) and are_all_in_collection(self.banished, other.banished))
 
     def __str__(self):
         return "Player {} has {} coin{} has character{}: {} and banished: {}".format(self.player_name, self.purse,
@@ -67,9 +80,10 @@ class MarketConfig(MarketAspect, ABC):
         self.banish_char = if_none_then_default(banish_char, 5)
 
     def __eq__(self, other):
-        return self.draft == other.draft and self.initial_purse == other.initial_purse and self.ante == other.ante and \
-            self.banish_char == other.banish_char and self.sell_char == other.sell_char and \
-            self.buy_char == other.buy_char
+        return (other is not None and
+                (self.draft == other.draft and self.initial_purse == other.initial_purse and self.ante == other.ante and
+                 self.banish_char == other.banish_char and self.sell_char == other.sell_char and
+                 self.buy_char == other.buy_char))
 
     def __str__(self):
         sell_part = " Sell characters for {} coin{},".format(self.sell_char, is_plural(
@@ -83,18 +97,24 @@ class MarketConfig(MarketAspect, ABC):
                                                                            self.banish_char,
                                                                            is_plural(self.banish_char))
 
+
 class MarketGameParticipant(MarketAspect, ABC):
     def __init__(self, player=None, character=None):
         self.player = player
         self.character = character
 
     def __eq__(self, other):
-        return self.player == other.player and self.character == other.character
+        return other is not None and self.player == other.player and self.character == other.character
 
     def __str__(self):
         return "Participant {} used {}".format(self.player, self.character)
 
+
 class MarketGame(MarketAspect, ABC):
-    def __init__(self, date=datetime.now(), participants=None):
+    def __init__(self, date=datetime.now(), participants: list[MarketGameParticipant] = None):
         self.participants = if_none_then_default(participants, list())
         self.date = date
+
+    def __eq__(self, other):
+        return other is not None and self.date == other.date and are_all_in_collection(self.participants,
+                                                                                       other.participants)

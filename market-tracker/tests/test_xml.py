@@ -3,32 +3,44 @@ import unittest
 from types import FunctionType, LambdaType
 from xml.etree.ElementTree import parse, Element, tostring
 
-from obj import is_str_valid, DATE_FORMAT, if_none_then_default
+from obj import is_str_valid, DATE_FORMAT, if_none_then_default, are_all_in_collection, in_map
 from obj.xml import MarketPlayerXML, XmlElements, NotXML, WrongXMLElement, is_iterable, make_list_from, MarketConfigXML, \
-    MarketGameParticipantXML, XmlAttributes
+    MarketGameParticipantXML, XmlAttributes, MarketGameXML
 
 
-def make_xml(tag, text, parent=None):
+def try_enum_val(what) -> str:
     try:
-        tag = tag.value
+        return what.value
     except AttributeError:
-        pass #Should be a string
+        return what
 
-    if parent is not None:
-        try:
-            parent = parent.value
-        except AttributeError:
-            pass #Should be a string
-    if isinstance(text, (list, set, tuple)):
-        ret = "".join([f"<{tag}>{t}</{tag}>" for t in text])
-        return f"<{parent}>{ret}</{parent}>" if is_str_valid(parent) else ret
-    ret = f"<{tag}>{text}</{tag}>"
-    return f"<{parent}>{ret}</{parent}>" if is_str_valid(parent) else ret
 
+def make_xml(tag, text, parent=None, attrib=None):
+    def gen_attrs(attr):
+        return ' {}'.format(' '.join([f'{try_enum_val(key)}="{val}"' for key, val in attrib[attr].items()])) if in_map(
+            attr, attrib) else ''
+
+    tag_fmt = "<{tag}{attr}>{cdata}</{tag}>"
+    ret = ''.join([tag_fmt.format(tag=try_enum_val(tag), attr=gen_attrs(t), cdata=t) for t in text]) if is_iterable(
+        text) else tag_fmt.format(tag=try_enum_val(tag), attr=gen_attrs(text), cdata=text)
+    return "<{p}{attr}>{cdata}</{p}>".format(p=try_enum_val(parent), attr=gen_attrs(parent), cdata=ret) if is_str_valid(
+        try_enum_val(parent)) else ret
+
+
+ARTIFICER = "Artificer"
+BARBARIAN = "Barbarian"
+BLACK_PANTHER = "Black Panther"
+BLACK_WIDOW = "Black Widow"
 CURSED_PIRATE = "Cursed Pirate"
+DR_STRANGE = "Dr. Strange"
 GUNSLINGER = "Gunslinger"
+HUNTRESS = "Huntress"
+KRAMPUS = "Krampus"
 LOKI = "Loki"
+MONK = "Monk"
+MOON_ELF = "Moon Elf"
 NINJA = "Ninja"
+PALADIN = "Paladin"
 PYROMANCER = "Pyromancer"
 SAMURAI = "Samurai"
 SANTA = "Santa"
@@ -36,13 +48,19 @@ SCARLET_WITCH = "Scarlet Witch"
 SERAPH = "Seraph"
 SHADOW_THIEF = "Shadow Thief"
 SPIDER_MAN = "Spider-man"
+TACTICIAN = "Tactician"
 THOR = "Thor"
+TREANT = "Treant"
+VAMPIRE_LORD = "Vampire Lord"
+
+BRIAN_NAME = "Brian"
+BRIAN_PURSE = 10
 
 DAREK_NAME = 'Darek'
 DAREK_PURSE = 5
 
-SHERRI_BANISHED = ["Black Widow", "Treant", "Barbarian"]
-SHERRI_CHARACTERS = ["Dr. Strange", "Monk", "Huntress", "Krampus", "Pyromancer", "Scarlet Witch"]
+SHERRI_BANISHED = [BLACK_WIDOW, TREANT, BARBARIAN]
+SHERRI_CHARACTERS = [DR_STRANGE, MONK, HUNTRESS, KRAMPUS, PYROMANCER, SCARLET_WITCH]
 SHERRI_NAME = "Sherri"
 SHERRI_PURSE = 6
 
@@ -101,7 +119,36 @@ PARTICIPANT_XML = f"<{XmlElements.CHARACTER.value} {XmlAttributes.PLAYER.value}=
 PARTICIPANT_FILE_PLAYER = DAREK_NAME
 PARTICIPANT_FILE_CHARACTER = SHADOW_THIEF
 
+GAME_CONSTRUCTOR_DATE = datetime(year=2024, month=12, day=25, hour=0, minute=34, second=3, microsecond=123456)
+GAME_CONSTRUCTOR_PARTICIPANTS = [
+    MarketGameParticipantXML(player=DAREK_NAME, character=BARBARIAN),
+    MarketGameParticipantXML(player=SHERRI_NAME, character=SERAPH),
+]
+
+GAME_STRING_DATE = datetime(year=2024, month=12, day=24, hour=12, minute=4, second=33, microsecond=123456)
+GAME_STRING_PARTICIPANTS = [
+    MarketGameParticipantXML(player=DAREK_NAME, character=SANTA),
+    MarketGameParticipantXML(player=SHERRI_NAME, character=BLACK_PANTHER),
+    MarketGameParticipantXML(player=BRIAN_NAME, character=PALADIN)
+]
+GAME_XML_STRING_PARTICIPANTS = make_xml(tag=XmlElements.CHARACTER, text=[SANTA, BLACK_PANTHER, PALADIN],
+                                        parent=XmlElements.PARTICIPANTS,
+                                        attrib={SANTA: {XmlAttributes.PLAYER: DAREK_NAME},
+                                                BLACK_PANTHER: {XmlAttributes.PLAYER: SHERRI_NAME},
+                                                PALADIN: {XmlAttributes.PLAYER: BRIAN_NAME}})
+GAME_XML_STRING = "<{game} date='{game_date}'>{the_game}</{game}>".format(game=XmlElements.GAME.value,
+                                                                          game_date=GAME_STRING_DATE.strftime(
+                                                                              DATE_FORMAT), the_game=''.join(
+        [GAME_XML_STRING_PARTICIPANTS]))
+
+GAME_FILE_PARTICIPANTS = [
+    MarketGameParticipantXML(player=DAREK_NAME, character=DR_STRANGE),
+    MarketGameParticipantXML(player=BRIAN_NAME, character=SAMURAI),
+    MarketGameParticipantXML(player=SHERRI_NAME, character=VAMPIRE_LORD),
+]
+
 GAME_ONE_DATE = datetime(year=2024, month=3, day=4, hour=19, minute=12, second=23, microsecond=123000)
+GAME_TWO_DATE = datetime(year=2024, month=4, day=4, hour=12, minute=19, second=23, microsecond=123000)
 
 
 class MarketXmlTest(unittest.TestCase):
@@ -131,6 +178,19 @@ class MarketXmlTest(unittest.TestCase):
             return None
         else:
             return xml.find(xpath)
+
+    def _get_a_game(self, date=None, participants=None):
+        game_path = [XmlElements.GAMES.value, XmlElements.GAME.value]
+        if date is not None:
+            return self._get_an_element(xpath=game_path,
+                                        get_first=lambda g: datetime.strptime(g.attrib[XmlAttributes.DATE.value],
+                                                                              DATE_FORMAT) == date)
+        elif participants is not None and participants:
+            return self._get_an_element(xpath=game_path, get_first=lambda g: are_all_in_collection(
+                make_list_from(g, the_path=f"./{XmlElements.PARTICIPANTS.value}/{XmlElements.CHARACTER.value}"),
+                participants))
+
+        return None
 
 
 class TestMarketPlayerXml(MarketXmlTest):
@@ -240,10 +300,44 @@ class TestMarketGameParticipantXML(MarketXmlTest):
                                                                                 character=PARTICIPANT_STRING_CHARACTER))
 
     def test_file(self):
-        self.participant = MarketGameParticipantXML(xml=self._get_an_element((XmlElements.PARTICIPANTS.value, XmlElements.CHARACTER.value), lambda x: x.attrib[XmlAttributes.PLAYER.value] == DAREK_NAME, self._get_an_element([XmlElements.GAMES.value, XmlElements.GAME.value], lambda x: datetime.strptime(x.attrib[XmlAttributes.DATE.value], DATE_FORMAT) == GAME_ONE_DATE)))
-        self._if_func_run_else_equal(self.participant, MarketGameParticipantXML(player=PARTICIPANT_FILE_PLAYER, character=PARTICIPANT_FILE_CHARACTER))
+        self.participant = MarketGameParticipantXML(
+            xml=self._get_an_element((XmlElements.PARTICIPANTS.value, XmlElements.CHARACTER.value),
+                                     lambda x: x.attrib[XmlAttributes.PLAYER.value] == DAREK_NAME,
+                                     self._get_a_game(GAME_ONE_DATE)))
+        self._if_func_run_else_equal(self.participant, MarketGameParticipantXML(player=PARTICIPANT_FILE_PLAYER,
+                                                                                character=PARTICIPANT_FILE_CHARACTER))
 
 
+class TestMarketGameXML(MarketXmlTest):
+    def test_constructor(self):
+        self.__assert_game(
+            check_game=MarketGameXML(date=GAME_CONSTRUCTOR_DATE, participants=GAME_CONSTRUCTOR_PARTICIPANTS),
+            expected_game=MarketGameXML(date=GAME_CONSTRUCTOR_DATE, participants=GAME_CONSTRUCTOR_PARTICIPANTS))
+
+    def test_string(self):
+        self.__assert_game(expected_participants=GAME_STRING_PARTICIPANTS,
+                           check_game=MarketGameXML(xml=GAME_XML_STRING))
+
+    def test_file(self):
+        self.__assert_game(expected_date=GAME_TWO_DATE, expected_participants=GAME_FILE_PARTICIPANTS,
+                           check_game=MarketGameXML(xml=self._get_a_game(GAME_TWO_DATE)))
+
+    def test_write_xml(self):
+        xml = MarketGameXML(date=GAME_CONSTRUCTOR_DATE, participants=GAME_CONSTRUCTOR_PARTICIPANTS).write_to()
+        check_game = MarketGameXML(xml=xml)
+        self.__assert_game(
+            expected_game=MarketGameXML(date=GAME_CONSTRUCTOR_DATE, participants=GAME_CONSTRUCTOR_PARTICIPANTS),
+            check_game=check_game)
+
+    def __assert_game(self, expected_game: MarketGameXML = None, expected_date: datetime = None,
+                      expected_participants: list[MarketGameParticipantXML] = None, check_game: MarketGameXML = None):
+        if expected_game is not None:
+            self.assertEqual(expected_game, check_game)
+        else:
+            if expected_date is not None:
+                self.assertEqual(expected_date, check_game.date)
+            if expected_participants is not None:
+                self.assertAllIn(expected_participants, check_game.participants)
 
 
 if __name__ == '__main__':
