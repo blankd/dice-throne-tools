@@ -19,6 +19,7 @@
         <character>Pyromancer</character>
         <character>Loki</character>
         <character>Cursed Pirate</character>
+        <character>Ninja</character>
       </characters>
       <banished>
         <character>Santa</character>
@@ -65,4 +66,20 @@
       </banished>
     </player>
   </players>
+  <games>
+    <game date="2024-03-04 19:12:23.123">
+      <participants>
+        <character player="Darek">Shadow Thief</character>
+        <character player="Sherri">Krampus</character>
+        <character player="Brian">Paladin</character>
+      </participants>
+    </game>
+    <game date="2024-04-04 12:19:23.123">
+      <participants>
+        <character player="Darek">Dr. Strange</character>
+        <character player="Brian">Samurai</character>
+        <character player="Sherri">Vampire Lord</character>
+      </participants>
+    </game>
+  </games>
 </market>
